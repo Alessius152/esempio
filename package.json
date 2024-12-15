@@ -1,20 +1,18 @@
 {
-  "name": "p2p",
-  "version": "1.0.0",
-  "main": "main.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "libp2p": "^2.4.2",
-    "libp2p-mplex": "^0.10.7",
-    "libp2p-secio": "^0.13.1",
-    "libp2p-tcp": "^0.17.2",
-    "multiaddr": "^10.0.1",
-    "peer-id": "^0.16.0"
-  }
+    "name": "p2p",
+    "version": "1.0.0",
+    "main": "main.js",
+    "type": "module",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "@chainsafe/libp2p-noise": "^16.0.0",
+        "@libp2p/tcp": "^10.0.14",
+        "libp2p": "^2.4.2"
+    }
 }

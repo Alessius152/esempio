@@ -1,74 +1,49 @@
-const Libp2p = require('libp2p')
-const TCP = require('libp2p-tcp')
-const MPLEX = require('libp2p-mplex')
-const SECIO = require('libp2p-secio')
-const PeerId = require('peer-id')
-const { multiaddr } = require('multiaddr')
+import { noise } from '@chainsafe/libp2p-noise';
+import { tcp } from '@libp2p/tcp';
+import { createLibp2p } from 'libp2p';
 
-async function createLibp2pNode() {
-    // Crea una chiave privata e un PeerId
-    const peerId = await PeerId.create()
+const createNode = async() => {
+    const node = await createLibp2p({
+        addresses: { listen: ['/ip4/0.0.0.0/tcp/0'] },
+        transports: [tcp()],
+        connectionEncrypters: [noise()],
+    });
 
-    // Crea il nodo libp2p
-    const node = await Libp2p.create({
-        peerId,
-        modules: {
-            transport: [TCP],
-            streamMuxer: [MPLEX],
-            connEncryption: [SECIO],
+    // Protocol definition
+    const protocol = '/my-protocol/1.0.0';
+
+    // Handle incoming messages
+    node.handle(protocol, async({ stream }) => {
+        const decoder = new TextDecoder();
+        const encoder = new TextEncoder();
+
+        for await (const chunk of stream.source) {
+            const message = decoder.decode(chunk);
+            console.log('Received:', message);
+
+            // Send a response
+            await stream.sink([encoder.encode(`Message received: ${message}`)]);
         }
-    })
+    });
 
-    // Avvia il nodo
-    await node.start()
+    return node;
+};
 
-    console.log('Node started with id:', node.peerId.toB58String())
-    return node
-}
+const main = async() => {
+    const node = await createNode();
 
-async function connectToExternalPeer() {
-    // Indirizzo IP pubblico del peer esterno (modifica con l'IP corretto)
-    const peerAddr = '/ip4/93.150.198.107/tcp/4000'
-    const multiAddr = multiaddr(peerAddr)
+    console.log('Node has started');
+    console.log('Listening on:');
+    node.getMultiaddrs().forEach((ma) => console.log(ma.toString()));
 
-    // Crea il nodo
-    const node = await createLibp2pNode()
+    process.on('SIGINT', async() => {
+        console.log('Shutting down node...');
+        await node.stop();
+        console.log('Node stopped');
+        process.exit(0);
+    });
+};
 
-    // Connetti al peer esterno
-    try {
-        await node.dial(multiAddr)
-        console.log('Connected to peer:', multiAddr.toString())
-
-        // Qui puoi aggiungere la logica per scaricare una risorsa
-        // Ad esempio, una volta connesso puoi inviare un messaggio al peer per richiedere una risorsa
-        const stream = await node.dialProtocol(multiAddr, '/my-custom-protocol')
-
-        // Esempio di invio di una richiesta (richiesta di risorsa)
-        const message = 'Scarica la risorsa'
-        stream.write(Buffer.from(message))
-
-        // Leggi i dati di risposta (la risorsa)
-        stream.on('data', (data) => {
-            console.log('Risorsa ricevuta:', data.toString())
-                // Puoi salvare o processare la risorsa qui
-        })
-
-        // Chiudi il stream dopo aver ricevuto la risorsa
-        stream.on('end', () => {
-            console.log('Trasferimento completato')
-        })
-
-    } catch (error) {
-        console.error('Errore durante la connessione al peer:', error)
-    }
-}
-
-// Esegui la connessione al peer esterno
-let i = 0
-let itvl = setInterval(() => {
-    console.log(++i)
-    if (i === 6) {
-        clearInterval(itvl)
-    }
-}, 1000)
-setTimeout(connectToExternalPeer, 6000)
+main().catch((err) => {
+    console.error('An error occurred:', err);
+});
