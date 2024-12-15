@@ -1,0 +1,17 @@
+{
+  "name": "p2p",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "simple-peer": "^9.11.1",
+    "twilio": "^5.4.0",
+    "wrtc": "^0.4.7"
+  }
+}
