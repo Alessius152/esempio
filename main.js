@@ -1,83 +1,74 @@
-const twilio = require('twilio');
-const SimplePeer = require('simple-peer');
-const wrtc = require('wrtc');
-const WebSocket = require('ws'); // WebSocket per il signaling
+const Libp2p = require('libp2p')
+const TCP = require('libp2p-tcp')
+const MPLEX = require('libp2p-mplex')
+const SECIO = require('libp2p-secio')
+const PeerId = require('peer-id')
+const { multiaddr } = require('multiaddr')
 
-// WebSocket server per scambio segnali
-const wss = new WebSocket.Server({ port: 8080 });
+async function createLibp2pNode() {
+    // Crea una chiave privata e un PeerId
+    const peerId = await PeerId.create()
 
-let connections = 0;
-let peers = {}; // Per mantenere traccia dei peer connessi
+    // Crea il nodo libp2p
+    const node = await Libp2p.create({
+        peerId,
+        modules: {
+            transport: [TCP],
+            streamMuxer: [MPLEX],
+            connEncryption: [SECIO],
+        }
+    })
 
-async function main() {
-    const accountSid = "AC97e57a540764c656a6d1e1d814f9c183";
-    const authToken = "428dc58d41522de9a859b20b3cba9cd7";
-    const client = twilio(accountSid, authToken);
-    const iceConfig = await client.tokens.create();
+    // Avvia il nodo
+    await node.start()
 
-    console.log(iceConfig);
-
-    // Gestione dei messaggi di signaling da e verso WebSocket
-    wss.on('connection', ws => {
-        console.log("Nuovo peer connesso");
-
-        ws.on('message', (message) => {
-            console.log("Messaggio ricevuto: ", message);
-
-            const data = JSON.parse(message);
-
-            if (data.type === 'offer') {
-                const peer = createPeer(ws, iceConfig); // Creazione del peer per il nuovo peer
-
-                peer.signal(data.signal); // Rispondere al segnale
-                peers[ws] = peer; // Mantenere traccia della connessione
-            } else if (data.type === 'answer') {
-                peers[ws].signal(data.signal); // Rispondere con l'answer del peer
-            } else if (data.type === 'candidate') {
-                peers[ws].signal(data.signal); // Gestire i nuovi candidati ICE
-            }
-        });
-
-        ws.on('close', () => {
-            console.log("Peer disconnesso");
-            delete peers[ws];
-        });
-    });
+    console.log('Node started with id:', node.peerId.toB58String())
+    return node
 }
 
-function createPeer(ws, iceConfig) {
-    const peer = new SimplePeer({
-        initiator: false,
-        trickle: false,
-        config: iceConfig,
-        wrtc: wrtc
-    });
+async function connectToExternalPeer() {
+    // Indirizzo IP pubblico del peer esterno (modifica con l'IP corretto)
+    const peerAddr = '/ip4/93.150.198.107/tcp/4000'
+    const multiAddr = multiaddr(peerAddr)
 
-    peer.on('signal', data => {
-        console.log('Segnale ricevuto dal peer:', data.candidate);
+    // Crea il nodo
+    const node = await createLibp2pNode()
 
-        // Inviare il segnale al peer remoto via WebSocket
-        ws.send(JSON.stringify({ type: 'offer', signal: data }));
-    });
+    // Connetti al peer esterno
+    try {
+        await node.dial(multiAddr)
+        console.log('Connected to peer:', multiAddr.toString())
 
-    peer.on('connect', () => {
-        connections++;
-        console.log(`Connessione stabilita. Numero di connessioni: ${connections}`);
-    });
+        // Qui puoi aggiungere la logica per scaricare una risorsa
+        // Ad esempio, una volta connesso puoi inviare un messaggio al peer per richiedere una risorsa
+        const stream = await node.dialProtocol(multiAddr, '/my-custom-protocol')
 
-    peer.on('data', data => {
-        console.log('Dati ricevuti dal peer:', data.toString());
-    });
+        // Esempio di invio di una richiesta (richiesta di risorsa)
+        const message = 'Scarica la risorsa'
+        stream.write(Buffer.from(message))
 
-    peer.on('error', err => {
-        console.error('Errore nella connessione peer:', err);
-    });
+        // Leggi i dati di risposta (la risorsa)
+        stream.on('data', (data) => {
+            console.log('Risorsa ricevuta:', data.toString())
+                // Puoi salvare o processare la risorsa qui
+        })
 
-    peer.on('close', () => {
-        console.log('Connessione chiusa.');
-    });
+        // Chiudi il stream dopo aver ricevuto la risorsa
+        stream.on('end', () => {
+            console.log('Trasferimento completato')
+        })
 
-    return peer;
+    } catch (error) {
+        console.error('Errore durante la connessione al peer:', error)
+    }
 }
 
-main();
+// Esegui la connessione al peer esterno
+let i = 0
+let itvl = setInterval(() => {
+    console.log(++i)
+    if (i === 6) {
+        clearInterval(itvl)
+    }
+}, 1000)
+setTimeout(connectToExternalPeer, 6000)

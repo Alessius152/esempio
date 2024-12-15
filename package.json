@@ -10,9 +10,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "simple-peer": "^9.11.1",
-    "twilio": "^5.4.0",
-    "wrtc": "^0.4.7",
-    "ws": "^8.18.0"
+    "libp2p": "^2.4.2",
+    "libp2p-mplex": "^0.10.7",
+    "libp2p-secio": "^0.13.1",
+    "libp2p-tcp": "^0.17.2",
+    "multiaddr": "^10.0.1",
+    "peer-id": "^0.16.0"
   }
 }
